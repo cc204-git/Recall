@@ -1,0 +1,5 @@
+{
+  "name": "Recall Rooster",
+  "description": "An application to help you schedule your active recall memorization sessions based on the forgetting curve. Add a topic you've memorized, and the app will generate a revision schedule to enhance long-term retention.",
+  "requestFramePermissions": []
+}

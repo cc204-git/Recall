@@ -1,20 +1,109 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MemoryItem, Revision } from './types';
-import { PlusIcon, CalendarIcon } from './components/icons';
+import { PlusIcon, CalendarIcon, LogoutIcon } from './components/icons';
 
 const REVISION_INTERVALS = [1, 7, 30]; // in days
+
+const LoginView: React.FC<{ onLogin: (username: string) => void }> = ({ onLogin }) => {
+    const [username, setUsername] = useState('');
+    const [existingUsers, setExistingUsers] = useState<string[]>([]);
+
+    useEffect(() => {
+        try {
+            const data = localStorage.getItem('recallRoosterData');
+            const allUserData = data ? JSON.parse(data) : {};
+            setExistingUsers(Object.keys(allUserData));
+        } catch (e) {
+            console.error("Failed to parse user data", e);
+            setExistingUsers([]);
+        }
+    }, []);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (username.trim()) {
+            onLogin(username.trim());
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-900 text-gray-100 font-sans flex flex-col items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-md mx-auto text-center">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                    <span role="img" aria-label="rooster" className="text-5xl">🐓</span>
+                    <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300">
+                        Recall Rooster
+                    </h1>
+                </div>
+                <p className="text-gray-400 mb-8">
+                    Login or create a new profile to save your revision schedules.
+                </p>
+
+                <form onSubmit={handleSubmit} className="mb-8">
+                    <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Enter your username"
+                        className="w-full px-4 py-3 bg-gray-800 border-2 border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-center text-lg"
+                        aria-label="Username"
+                    />
+                    <button
+                        type="submit"
+                        className="mt-4 w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg transition-transform duration-200 ease-in-out disabled:bg-gray-700 disabled:cursor-not-allowed"
+                        disabled={!username.trim()}
+                    >
+                        Login / Create Profile
+                    </button>
+                </form>
+
+                {existingUsers.length > 0 && (
+                    <div>
+                        <h2 className="text-gray-500 text-sm font-semibold mb-3">Or select an existing profile:</h2>
+                        <div className="flex flex-wrap justify-center gap-2">
+                            {existingUsers.map(user => (
+                                <button
+                                    key={user}
+                                    onClick={() => onLogin(user)}
+                                    className="bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium py-2 px-4 rounded-lg transition-colors"
+                                >
+                                    {user}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 const Header: React.FC<{
     activeView: 'add' | 'schedule';
     setActiveView: (view: 'add' | 'schedule') => void;
-}> = ({ activeView, setActiveView }) => {
+    currentUser: string | null;
+    onLogout: () => void;
+}> = ({ activeView, setActiveView, currentUser, onLogout }) => {
     const baseButtonClasses = "flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors duration-200";
     const activeButtonClasses = "bg-sky-500 text-white shadow-md";
     const inactiveButtonClasses = "bg-gray-700 hover:bg-gray-600";
 
     return (
-        <header className="w-full max-w-2xl mx-auto p-4 flex flex-col items-center gap-4">
+        <header className="w-full max-w-2xl mx-auto p-4 flex flex-col items-center gap-4 relative">
+            {currentUser && (
+                <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
+                  <span className="text-gray-300 text-sm hidden sm:inline">Logged in as <strong>{currentUser}</strong></span>
+                  <button 
+                    onClick={onLogout} 
+                    title="Logout"
+                    className="bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5">
+                      <LogoutIcon />
+                      <span className="hidden sm:inline">Logout</span>
+                  </button>
+                </div>
+              )}
             <div className="flex items-center gap-3">
                 <span role="img" aria-label="rooster" className="text-4xl">🐓</span>
                 <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300">
@@ -26,6 +115,7 @@ const Header: React.FC<{
                 <button
                     onClick={() => setActiveView('add')}
                     className={`${baseButtonClasses} ${activeView === 'add' ? activeButtonClasses : inactiveButtonClasses}`}
+                    aria-pressed={activeView === 'add'}
                 >
                     <PlusIcon />
                     Add Memory
@@ -33,6 +123,7 @@ const Header: React.FC<{
                 <button
                     onClick={() => setActiveView('schedule')}
                     className={`${baseButtonClasses} ${activeView === 'schedule' ? activeButtonClasses : inactiveButtonClasses}`}
+                    aria-pressed={activeView === 'schedule'}
                 >
                     <CalendarIcon />
                     Revision Schedule
@@ -178,25 +269,68 @@ const ScheduleView: React.FC<{ memoryItems: MemoryItem[], onDeleteMemory: (id: s
 };
 
 export default function App() {
-    const [view, setView] = useState<'add' | 'schedule'>('add');
-    const [memoryItems, setMemoryItems] = useState<MemoryItem[]>(() => {
+    const [currentUser, setCurrentUser] = useState<string | null>(() => {
         try {
-            const items = localStorage.getItem('memoryItems');
-            return items ? JSON.parse(items) : [];
-        } catch (error) {
-            console.error("Error reading from localStorage", error);
-            return [];
+            return localStorage.getItem('recallRoosterCurrentUser');
+        } catch {
+            return null;
         }
     });
 
-    useEffect(() => {
-        try {
-            localStorage.setItem('memoryItems', JSON.stringify(memoryItems));
-        } catch (error) {
-            console.error("Error writing to localStorage", error);
-        }
-    }, [memoryItems]);
+    const [view, setView] = useState<'add' | 'schedule'>('add');
+    const [memoryItems, setMemoryItems] = useState<MemoryItem[]>([]);
     
+    useEffect(() => {
+        if (currentUser) {
+            try {
+                const data = localStorage.getItem('recallRoosterData');
+                const allUserData = data ? JSON.parse(data) : {};
+                setMemoryItems(allUserData[currentUser] || []);
+            } catch (error) {
+                console.error("Error reading user data from localStorage", error);
+                setMemoryItems([]);
+            }
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (currentUser) {
+            try {
+                const data = localStorage.getItem('recallRoosterData');
+                const allUserData = data ? JSON.parse(data) : {};
+                allUserData[currentUser] = memoryItems;
+                localStorage.setItem('recallRoosterData', JSON.stringify(allUserData));
+            } catch (error) {
+                console.error("Error writing user data to localStorage", error);
+            }
+        }
+    }, [memoryItems, currentUser]);
+
+    const handleLogin = (username: string) => {
+        try {
+            const data = localStorage.getItem('recallRoosterData');
+            const allUserData = data ? JSON.parse(data) : {};
+            if (!allUserData[username]) {
+                allUserData[username] = [];
+                localStorage.setItem('recallRoosterData', JSON.stringify(allUserData));
+            }
+            localStorage.setItem('recallRoosterCurrentUser', username);
+            setCurrentUser(username);
+        } catch (error) {
+            console.error("Failed to login", error);
+        }
+    };
+    
+    const handleLogout = () => {
+        try {
+            localStorage.removeItem('recallRoosterCurrentUser');
+            setCurrentUser(null);
+            setView('add');
+        } catch (error) {
+            console.error("Failed to logout", error);
+        }
+    };
+
     const handleAddMemory = useCallback((topic: string) => {
         const newItem: MemoryItem = {
             id: Date.now().toString(),
@@ -213,6 +347,10 @@ export default function App() {
         }
     }, []);
 
+    if (!currentUser) {
+        return <LoginView onLogin={handleLogin} />;
+    }
+
     return (
         <div className="min-h-screen bg-gray-900 text-gray-100 font-sans flex flex-col items-center p-4 sm:p-6">
             <style>{`
@@ -224,7 +362,7 @@ export default function App() {
                 animation: fade-in 0.5s ease-out forwards;
               }
             `}</style>
-            <Header activeView={view} setActiveView={setView} />
+            <Header activeView={view} setActiveView={setView} currentUser={currentUser} onLogout={handleLogout} />
             <main className="w-full max-w-2xl mx-auto mt-6">
                 {view === 'add' ? (
                     <AddMemoryView onAddMemory={handleAddMemory} />

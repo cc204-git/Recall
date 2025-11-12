@@ -133,30 +133,83 @@ const Header: React.FC<{
     );
 };
 
-const AddMemoryView: React.FC<{ onAddMemory: (topic: string) => void }> = ({ onAddMemory }) => {
+const AddMemoryView: React.FC<{ onAddMemory: (topic: string, date: Date) => void }> = ({ onAddMemory }) => {
     const [topic, setTopic] = useState('');
+    const [learnDate, setLearnDate] = useState(new Date());
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (topic.trim()) {
-            onAddMemory(topic.trim());
+            onAddMemory(topic.trim(), learnDate);
             setTopic('');
+            setLearnDate(new Date());
         }
+    };
+
+    const formatDateForInput = (date: Date) => {
+        return date.toISOString().split('T')[0];
+    };
+
+    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const date = new Date(e.target.value + 'T00:00:00');
+        setLearnDate(date);
+    };
+    
+    const setToToday = () => {
+        setLearnDate(new Date());
+    };
+
+    const setToYesterday = () => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        setLearnDate(yesterday);
     };
 
     return (
         <div className="w-full animate-fade-in">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="e.g., Chapter 1 of 'Atomic Habits'"
-                    className="w-full px-4 py-3 bg-gray-700 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
-                />
+                 <div>
+                    <label htmlFor="topic-input" className="block text-sm font-medium text-gray-400 mb-2">
+                        What did you learn?
+                    </label>
+                    <input
+                        id="topic-input"
+                        type="text"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        placeholder="e.g., Chapter 1 of 'Atomic Habits'"
+                        className="w-full px-4 py-3 bg-gray-700 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all"
+                        aria-label="Topic learned"
+                    />
+                </div>
+
+                <div>
+                    <label htmlFor="learn-date" className="block text-sm font-medium text-gray-400 mb-2">
+                        Date Learned
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                         <input
+                            id="learn-date"
+                            type="date"
+                            value={formatDateForInput(learnDate)}
+                            onChange={handleDateChange}
+                            max={formatDateForInput(new Date())}
+                            className="flex-grow px-4 py-3 bg-gray-700 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all text-gray-200"
+                            style={{ colorScheme: 'dark' }}
+                            aria-label="Date learned"
+                         />
+                         <button type="button" onClick={setToToday} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg transition-colors">
+                            Today
+                         </button>
+                         <button type="button" onClick={setToYesterday} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-lg transition-colors">
+                            Yesterday
+                         </button>
+                    </div>
+                </div>
+
                 <button
                     type="submit"
-                    className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg transition-transform duration-200 ease-in-out disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg transition-transform duration-200 ease-in-out disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
                     disabled={!topic.trim()}
                 >
                     <PlusIcon />
@@ -331,11 +384,11 @@ export default function App() {
         }
     };
 
-    const handleAddMemory = useCallback((topic: string) => {
+    const handleAddMemory = useCallback((topic: string, dateAdded: Date) => {
         const newItem: MemoryItem = {
             id: Date.now().toString(),
             topic,
-            dateAdded: new Date().toISOString(),
+            dateAdded: dateAdded.toISOString(),
         };
         setMemoryItems(prevItems => [...prevItems, newItem]);
         setView('schedule'); // Switch to schedule view after adding
